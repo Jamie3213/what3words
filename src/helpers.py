@@ -1,15 +1,16 @@
-import fiona.crs
 import geopandas as gpd
 from math import ceil, floor
 import random
 import requests
-from shapely.geometry import box, Point, MultiPolygon
+from shapely.geometry import box
+from sqlalchemy import Column, Integer, String, DateTime, MetaData, Table, create_engine
+from geoalchemy2 import Geometry
 
 
 def get_data():
     # get GeoJSON from API
     lad_url = 'https://opendata.arcgis.com/datasets/1d78d47c87df4212b79fe2323aae8e08_0.geojson'
-    response = requests.get(url)
+    response = requests.get(lad_url)
     content = response.content
 
     # read as spatial dataframe
@@ -81,7 +82,7 @@ def create_words_combos(words, num_combos):
         combo = f'{random.choice(words)}'
         f'.{random.choice(words)}'
         f'.{random.choice(words)}'
-        
+     
         # make sure we don't have duplicate combinations
         if combo in combos:
             i -= 1
@@ -98,9 +99,28 @@ def construct_dataframe(geom_as_mesh, combos):
     return what3words
 
 
-def connect_to_db():
-    pass
+def get_engine(user, pwd, host, db):
+    # connect to the DB
+    conn_string = f'postgresql://{user}:{pwd}@{host}/{db}'
+    return create_engine(conn_string)
 
 
-def write_words(words_df):
-    pass
+def insert_rows(engine, schema, table, data)
+    # metadata registry
+    metadata = MetaData(bind=engine, schema=schema)
+
+    # define table object
+    what_three_words = Table(
+        table, metadata,
+        Column('id', Integer, primary_key=True),
+        Column('three_words', String(255)),
+        Column('geom', Geometry),
+        Column('created_at', DateTime))
+
+    # insert rows
+    iterable = data.to_dict(orient='records')
+    with engine.begin():
+        conn.execute(
+            test_table.insert(),
+            iterable)
+            
