@@ -2,8 +2,10 @@ import geopandas as gpd
 from math import ceil, floor
 import random
 import requests
+from shapely import wkt
 from shapely.geometry import box
-from sqlalchemy import Column, Integer, String, DateTime, MetaData, Table, create_engine
+from sqlalchemy import Column, Integer, String, DateTime, MetaData, Table
+from sqlalchemy import create_engine
 from geoalchemy2 import Geometry
 
 
@@ -22,7 +24,7 @@ def get_data():
     return bury_geom.geometry.values[0]
 
 
-def create_bounding_box(geom, res):
+def generate_mesh(geom, res):
     # utility function to round to a given base
     def round_to_base(num, base, direction):
         if direction == 'up':
@@ -35,11 +37,11 @@ def create_bounding_box(geom, res):
     # grid resolution
     minx, miny, maxx, maxy = geom.bounds
 
-    width = round_to_base(maxx, base=res, direction='up')
-    - round_to_base(minx, base=res, direction='down')
+    width = round_to_base(maxx, base=res, direction='up') \
+        - round_to_base(minx, base=res, direction='down')
 
-    height = round_to_base(maxy, base=res, direction='up')
-    - round_to_base(miny, base=res, direction='down')
+    height = round_to_base(maxy, base=res, direction='up') \
+        - round_to_base(miny, base=res, direction='down')
 
     # calculate number of vertical and horizontal cells
     cells_x = int(width / res)
@@ -79,9 +81,9 @@ def create_words_combos(words, num_combos):
     combos = []
     for i in range(num_combos):
         # parse combo
-        combo = f'{random.choice(words)}'
-        f'.{random.choice(words)}'
-        f'.{random.choice(words)}'
+        combo = f'{random.choice(words)}' \
+                f'.{random.choice(words)}' \
+                f'.{random.choice(words)}'
      
         # make sure we don't have duplicate combinations
         if combo in combos:
@@ -90,11 +92,13 @@ def create_words_combos(words, num_combos):
             combos.append(combo)
 
 
-def construct_dataframe(geom_as_mesh, combos):
-    what3words = gpd.GeoDataFrame({'geometry': cell} for cell in geom_as_mesh)
+def construct_dataframe(overlayed_mesh, combos):
+    what3words = gpd.GeoDataFrame({'geometry': cell}
+                                  for cell in overlayed_mesh)
     what3words['three_words'] = combos
 
     # convert projection
+    what3words.set_crs('EPSG:27700', inplace=True)
     what3words.to_crs('EPSG:4326', inplace=True)
     return what3words
 
@@ -105,7 +109,7 @@ def get_engine(user, pwd, host, db):
     return create_engine(conn_string)
 
 
-def insert_rows(engine, schema, table, data)
+def insert_rows(engine, schema, table, data):
     # metadata registry
     metadata = MetaData(bind=engine, schema=schema)
 
@@ -118,9 +122,12 @@ def insert_rows(engine, schema, table, data)
         Column('created_at', DateTime))
 
     # insert rows
+    # convert geometry to WKT string
+    data['geometry'] = [wkt.dumps(row.geometry) for row in data.itertuples()]
+    data.rename(columns={'geometry': 'geom'}, inplace=True)
     iterable = data.to_dict(orient='records')
-    with engine.begin():
+    with engine.begin() as conn:
         conn.execute(
-            test_table.insert(),
+            what_three_words.insert(),
             iterable)
-            
+         

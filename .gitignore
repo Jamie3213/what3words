@@ -148,3 +148,5 @@ dmypy.json
 .DS_Store
 venv/
 .vscode/
+**ipynb
+config.py
