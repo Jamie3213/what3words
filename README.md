@@ -357,3 +357,7 @@ The ```st_intersects``` returns a boolean value if the two arguments intersect a
 ![query_result](./assets/query_result.png)
 
 As we can see, the encoding has worked perfectly and refers to the 100m square right at the entrance of Holy Cross College!
+
+## Closing Thoughts
+
+We've seen how we can create a simple what3words clone by using the spatial features of ```geopandas``` and ```shapely``` to create a mesh from an arbitrary polygon, along with the spatial features offered by the PostGIS extension for PostgreSQL. Then, using only simple SQL queries, we've seen how we can encode any spatial coordinates within our original polygon with its three-word place identifier.
