@@ -41,7 +41,7 @@ config = {
 }
 ```
 
-In addition, let's set up some basic loggingg funtionality which will write to the console and to a dedicated log file:
+In addition, let's set up some basic logging funtionality which will write to the console and to a dedicated log file:
 
 ```python
 # logger.py
@@ -170,7 +170,7 @@ If we plot the mesh along with the original polygon we get a better idea of how 
 
 ![mesh](./assets/mesh.png)
 
-Now that we've got our mesh, we need words to assign to the cells in it. Luckily, we can use [this](https://www.mit.edu/~ecprice/wordlist.10000) open-source list from MIT:
+Now that we've got our mesh, we need words to assign to the cells in it. Luckily, we can use [this](https://www.mit.edu/~ecprice/wordlist.10000) open-source list from MIT (note that we'll restrict ourselves to five-letter words):
 
 ```python
 # helpers.py
@@ -185,7 +185,7 @@ A big list of words isn't much use on its own, we need to create combinations:
 
 ```python
 # helpers.py
-def create_words_combos(words, num_combos):
+def create_word_combos(words, num_combos):
     combos = []
     for i in range(num_combos):
         # parse combo
@@ -217,7 +217,7 @@ def construct_dataframe(overlayed_mesh, combos):
 
 ## Writing Our Mesh to PostgreSQL
 
-We have a mesh, so all that's left to do with it is to add it to our database. We already have a table defined, so we'll use SQLAlchemy to interact with it, the first step of which is to create an ```Engine``` object:
+We now have a mesh, so all that's left to do is to add it to our database. We already have a table defined, so we'll use SQLAlchemy to interact with it, the first step of which is to create an ```Engine``` object:
 
 ```python
 # helpers.py
@@ -227,7 +227,7 @@ def get_engine(user, pwd, host, db):
     return create_engine(conn_string)
 ```
 
-Now we just need to define the target table structure in the metadata registry and bulk insert our dataframe into the table.Note that we'll make use of the ```engine.begin``` method so that we auto-rollback on failure:
+Now we just need to define the target table structure in the metadata registry and bulk insert our dataframe into the table. Note that we'll make use of the ```engine.begin``` method so that we auto-rollback on failure:
 
 ```python
 # helpers.py
@@ -352,12 +352,12 @@ where st_intersects(
     geom)
 ```
 
-The ```st_intersects``` function returns a boolean value indicating whether the two arguments intersect and the ```st_setsrid``` function is used to set the projection of our coordinates to match the projection of the geometries in the table (EPSG:4326). After executing the above query we return a ```three_words``` value of ```tones.shape.wrong```, and (in pgAdmin) if we check the geometry viewer of the polygon identified as being intersected by our point, we see:
+The ```st_intersects``` function returns a boolean value indicating whether the two arguments intersect and the ```st_setsrid``` function is used to set the projection of our coordinates to match the projection of the geometries in the table (EPSG:4326). After executing the above query we return a ```three_words``` value of ```tones.shape.wrong```, and (in pgAdmin) if we check the geometry viewer of the polygon identified we see:
 
 ![query_result](./assets/query_result.png)
 
-As we can see, the encoding has worked perfectly and refers to the 100m square right at the entrance of Holy Cross College!
+The encoding has worked perfectly and refers to the 100m square right at the entrance of Holy Cross College!
 
 ## Closing Thoughts
 
-We've seen how we can create a simple what3words clone by using the spatial features of ```geopandas``` and ```shapely``` to create a mesh from an arbitrary polygon, along with the spatial features offered by the PostGIS extension for PostgreSQL. Then, using only simple SQL queries, we've seen how we can encode any spatial coordinates within our original polygon with its three-word place identifier.
+We've seen how we can create a simple what3words clone by using the spatial features of ```geopandas``` and ```shapely``` to create a mesh from an arbitrary polygon, along with the spatial features offered by the PostGIS extension for PostgreSQL. Then, using only simple SQL queries, we've seen how we can encode any spatial coordinates within our original polygon with a three-word place identifier.
