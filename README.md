@@ -352,7 +352,7 @@ where st_intersects(
     geom)
 ```
 
-The ```st_intersects``` returns a boolean value if the two arguments intersect and the ```st_setsrid``` is used to set the projection of our coordinates to match the projection of the geometries in the table (EPSG:4326). After executing the above query we return a ```three_words``` value of ```tones.shape.wrong```, and (in pgAdmin) if we check the geometry viewer of the polygon identified as being intersected by our point, we see:
+The ```st_intersects``` function returns a boolean value indicating whether the two arguments intersect and the ```st_setsrid``` function is used to set the projection of our coordinates to match the projection of the geometries in the table (EPSG:4326). After executing the above query we return a ```three_words``` value of ```tones.shape.wrong```, and (in pgAdmin) if we check the geometry viewer of the polygon identified as being intersected by our point, we see:
 
 ![query_result](./assets/query_result.png)
 
