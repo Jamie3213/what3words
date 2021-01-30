@@ -31,7 +31,6 @@ Before we start writing our main ETL, let's set up a config module containing ou
 
 ```python
 # config.py
-
 config = {
     'user': 'postgres',
     'pwd': '<my password>',
@@ -46,7 +45,6 @@ In addition, let's set up some basic loggingg funtionality which will write to t
 
 ```python
 # logger.py
-
 import logging
 
 logger = logging.getLogger('etl')
@@ -83,6 +81,7 @@ In order to assign word combinations to places, we first need a grid on which to
 Let's start by creating a helper module of the various functions we'll need. To begin, we'll import the relevant packages:
 
 ```python
+# helpers.py
 import geopandas as gpd
 from math import ceil, floor
 import random
@@ -97,6 +96,7 @@ from geoalchemy2 import Geometry
 As mentioned earlier, we're going to use the boundary of Bury, England which can be downloaded from [here](https://geoportal.statistics.gov.uk/datasets/local-authority-districts-december-2019-boundaries-uk-bfe-1?where=LAD19NM%20%3D%20%27Bury%27), however we'll use the public API to pull the data rather than manually saving it down:
 
 ```python
+# helpers.py
 def get_data():
     # get GeoJSON from API
     lad_url = 'https://opendata.arcgis.com/datasets/1d78d47c87df4212b79fe2323aae8e08_0.geojson'
@@ -115,6 +115,7 @@ def get_data():
 Now that we've got our boundary, we can generate the mesh in line with the process described above. We'll opt for a 100m resolution (mainly for performance reasons):
 
 ```python
+# helpers.py
 def generate_mesh(geom, res):
     # utility function to round to a given base
     def round_to_base(num, base, direction):
@@ -159,6 +160,7 @@ def generate_mesh(geom, res):
 Next we need to restrict the mesh to the boundary of our starting polygon and to do this we'll essentially pull out cells from the mesh which intersect the original geometry:
 
 ```python
+# helpers.py
 def overlay_mesh(geom, mesh):
     # extract cells which intersect the main polygon
     return [cell for cell in mesh if cell.intersects(geom)]
@@ -171,6 +173,7 @@ If we plot the mesh along with the original polygon we get a better idea of how 
 Now that we've got our mesh, we need words to assign to the cells in it. Luckily, we can use [this](https://www.mit.edu/~ecprice/wordlist.10000) open-source list from MIT:
 
 ```python
+# helpers.py
 def get_words():
     # create a list of 5 letter words
     word_url = 'https://www.mit.edu/~ecprice/wordlist.10000'
@@ -181,6 +184,7 @@ def get_words():
 A big list of words isn't much use on its own, we need to create combinations:
 
 ```python
+# helpers.py
 def create_words_combos(words, num_combos):
     combos = []
     for i in range(num_combos):
@@ -199,6 +203,7 @@ def create_words_combos(words, num_combos):
 Finally, we can construct a spatial dataframe of grid squares and their corresponding three-word encoding:
 
 ```python
+# helpers.py
 def construct_dataframe(overlayed_mesh, combos):
     what3words = gpd.GeoDataFrame({'geometry': cell}
                                   for cell in overlayed_mesh)
@@ -209,3 +214,144 @@ def construct_dataframe(overlayed_mesh, combos):
     what3words.to_crs('EPSG:4326', inplace=True)
     return what3words
 ```
+
+## Writing Our Mesh to PostgreSQL
+
+We have a mesh, so all that's left to do with it is to add it to our database. We already have a table defined, so we'll use SQLAlchemy to interact with it, the first step of which is to create an ```Engine``` object:
+
+```python
+# helpers.py
+def get_engine(user, pwd, host, db):
+    # connect to the DB
+    conn_string = f'postgresql://{user}:{pwd}@{host}/{db}'
+    return create_engine(conn_string)
+```
+
+Now we just need to define the target table structure in the metadata registry and bulk insert our dataframe into the table.Note that we'll make use of the ```engine.begin``` method so that we auto-rollback on failure:
+
+```python
+# helpers.py
+def insert_rows(engine, schema, table, data):
+    # metadata registry
+    metadata = MetaData(bind=engine, schema=schema)
+
+    # define table object
+    what_three_words = Table(
+        table, metadata,
+        Column('id', Integer, primary_key=True),
+        Column('three_words', String(255)),
+        Column('geom', Geometry),
+        Column('created_at', DateTime))
+
+    # insert rows
+    # convert geometry to WKT string
+    data['geometry'] = [wkt.dumps(row.geometry) for row in data.itertuples()]
+    data.rename(columns={'geometry': 'geom'}, inplace=True)
+    iterable = data.to_dict(orient='records')
+    with engine.begin() as conn:
+        conn.execute(
+            what_three_words.insert(),
+            iterable)
+```
+
+## Executing the ETL
+
+Now that we've defined all the necessary pieces of our helpers module, we can create a main script which runs through each of the pieces and carries our some basic error checking and logging:
+
+```python
+from config import config
+import helpers
+from logger import logger
+
+
+def main():
+    # read config variables
+    try:
+        USER = config['user']
+        PWD = config['pwd']
+        HOST = config['host']
+        DB = config['db']
+        SCHEMA = config['schema']
+        TABLE = config['table']
+    except KeyError as e:
+        logger.error(f'Missing config variable {e}')
+        raise
+
+    # read in the data
+    logger.info('Downloading and reading data')
+    geom = helpers.get_data()
+
+    # create a mesh of the defined resolution
+    logger.info('Generating bounding mesh')
+    mesh = helpers.generate_mesh(geom, 100)
+
+    # get the intersection between the geom and the mesh
+    logger.info('Overlaying geometry with mesh')
+    overlayed_mesh = helpers.overlay_mesh(geom, mesh)
+    logger.info(f'Restricted mesh created with {len(overlayed_mesh)} cells')
+
+    # generate a list of 5 letter words
+    logger.info('Generating words')
+    words = helpers.get_words()
+
+    # create three word combinations
+    logger.info('Create word combinations')
+    num_combos = len(overlayed_mesh)
+    combos = helpers.create_word_combos(words, num_combos)
+
+    # create a dataframe of words and cells
+    logger.info('Creating spatial dataframe')
+    words_geoms_df = helpers.construct_dataframe(overlayed_mesh, combos)
+
+    # create DB engine with SQLAlchemy
+    logger.info('Connecting to the database')
+    engine = helpers.get_engine(USER, PWD, HOST, DB)
+
+    # insert into database
+    logger.info('Inserting data into database')
+    try:
+        helpers.insert_rows(engine, SCHEMA, TABLE, words_geoms_df)
+    except Exception as e:
+        logger.error(f'Insertion failed with error {e}')
+        raise
+
+
+if __name__ == '__main__':
+    main()
+```
+
+We can the execute the script to load our database from the command line:
+
+```bash
+python etl.py
+```
+
+From the log file, we can see that everything has executed successfully:
+
+```txt
+2021-01-29 22:03:17,588 - etl - INFO - Downloading and reading data
+2021-01-29 22:04:17,203 - etl - INFO - Generating bounding mesh
+2021-01-29 22:04:17,319 - etl - INFO - Overlaying geometry with mesh
+2021-01-29 22:04:18,598 - etl - INFO - Restricted mesh created with 10356 cells
+2021-01-29 22:04:18,598 - etl - INFO - Generating words
+2021-01-29 22:04:19,452 - etl - INFO - Create word combinations
+2021-01-29 22:04:20,262 - etl - INFO - Creating spatial dataframe
+2021-01-29 22:04:20,903 - etl - INFO - Connecting to the database
+2021-01-29 22:04:20,956 - etl - INFO - Inserting data into database
+```
+
+## Testing the Functionality
+
+We now have a database which we can use to encode aribitrary locations based on their spatial coordinates. For example, let's get the place name for my old Sixth Form College from the coordinates of the entrance:
+
+```sql
+select * 
+from geo_coding.what_three_words
+where st_intersects(st_setsrid('POINT(-2.299606 53.584685)'::geometry, 4326), geom)
+```
+
+The ```st_intersects``` returns a boolean value if the two arguments intersect and the ```st_setsrid``` is used to set the projection of our coordinates to match the projection of the geometries in the table (EPSG:4326). After executing the above query we return a ```three_words``` value of ```tones.shape.wrong```, and (in pgAdmin) if we check the geometry viewer of the polygon identified as being intersected by our point, we see:
+
+![holy_cross]('./assets/holy_cross.png)
+
+As we can see, the encoding has worked perfectly and does indeed refer to the 100m square right at the entrance of Holy Cross College!

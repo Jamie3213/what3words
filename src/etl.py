@@ -36,7 +36,7 @@ def main():
     # create three word combinations
     logger.info('Create word combinations')
     num_combos = len(overlayed_mesh)
-    combos = helpers.create_words_combos(words, num_combos)
+    combos = helpers.create_word_combos(words, num_combos)
 
     # create a dataframe of words and cells
     logger.info('Creating spatial dataframe')

@@ -11,7 +11,8 @@ from geoalchemy2 import Geometry
 
 def get_data():
     # get GeoJSON from API
-    lad_url = 'https://opendata.arcgis.com/datasets/1d78d47c87df4212b79fe2323aae8e08_0.geojson'
+    lad_url = 'https://opendata.arcgis.com' + \
+              '/datasets/1d78d47c87df4212b79fe2323aae8e08_0.geojson'
     response = requests.get(lad_url)
     content = response.content
 
@@ -77,7 +78,7 @@ def get_words():
     return [word for word in all_words.split('\n') if len(word) == 5]
 
 
-def create_words_combos(words, num_combos):
+def create_word_combos(words, num_combos):
     combos = []
     for i in range(num_combos):
         # parse combo
@@ -90,6 +91,8 @@ def create_words_combos(words, num_combos):
             i -= 1
         else:
             combos.append(combo)
+    
+    return combos
 
 
 def construct_dataframe(overlayed_mesh, combos):
