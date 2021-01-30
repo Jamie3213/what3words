@@ -1,3 +1,4 @@
+from geoalchemy2 import Geometry
 import geopandas as gpd
 from math import ceil, floor
 import random
@@ -6,7 +7,6 @@ from shapely import wkt
 from shapely.geometry import box
 from sqlalchemy import Column, Integer, String, DateTime, MetaData, Table
 from sqlalchemy import create_engine
-from geoalchemy2 import Geometry
 
 
 def get_data():

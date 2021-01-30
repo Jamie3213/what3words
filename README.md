@@ -82,6 +82,7 @@ Let's start by creating a helper module of the various functions we'll need. To 
 
 ```python
 # helpers.py
+from geoalchemy2 import Geometry
 import geopandas as gpd
 from math import ceil, floor
 import random
@@ -90,7 +91,6 @@ from shapely import wkt
 from shapely.geometry import box
 from sqlalchemy import Column, Integer, String, DateTime, MetaData, Table
 from sqlalchemy import create_engine
-from geoalchemy2 import Geometry
 ```
 
 As mentioned earlier, we're going to use the boundary of Bury, England which can be downloaded from [here](https://geoportal.statistics.gov.uk/datasets/local-authority-districts-december-2019-boundaries-uk-bfe-1?where=LAD19NM%20%3D%20%27Bury%27), however we'll use the public API to pull the data rather than manually saving it down:
