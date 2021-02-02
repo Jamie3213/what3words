@@ -14,13 +14,13 @@ create table geo_coding.what_three_words(
 	three_words varchar(255),
 	geom geometry('GEOMETRY', 4326) not null,
 	created_at timestamp default now()
-)
+);
 
 create index geom_geohash_idx
-on geo_coding.what_three_words(st_geohash(geom))
+on geo_coding.what_three_words(st_geohash(geom));
 
 cluster geo_coding.what_three_words 
-using geom_geohash_idx
+using geom_geohash_idx;
 ```
 
 We've created a table with four columns: an auto-incrementing integer as the primary key, a column to store the three-word identifier for each cell, a geometry column to store the actual cell geometry (with standard WGS84/EPSG:4326 projection), as well as a reference column which is auto-populated on insertion with a timestamp. In addition we've created a clustered index on the ```geom``` column. This makes our querying more efficient by storing spatially correlated rows together on the physical hard disk (see [here](https://postgis.net/workshops/postgis-intro/clusterindex.html) for a good article on this in the PostGIS documentation). Postgres creates a non-clustered index on the primary key column by default, so there's nothing else for us to do to set our table up.
@@ -93,7 +93,22 @@ from sqlalchemy import Column, Integer, String, DateTime, MetaData, Table
 from sqlalchemy import create_engine
 ```
 
-As mentioned earlier, we're going to use the boundary of Bury, England which can be downloaded from [here](https://geoportal.statistics.gov.uk/datasets/local-authority-districts-december-2019-boundaries-uk-bfe-1?where=LAD19NM%20%3D%20%27Bury%27), however we'll use the public API to pull the data rather than manually saving it down:
+As mentioned earlier, we're going to use the boundary of Bury, England which can be downloaded from [here](https://geoportal.statistics.gov.uk/datasets/local-authority-districts-december-2019-boundaries-uk-bfe-1?where=LAD19NM%20%3D%20%27Bury%27), and which possesses the following structure:
+
+| Column        | Data Type | Description                           |
+|---------------|-----------|---------------------------------------|
+| OBJECTID      | Integer   | Unique row identifier                 |
+| BNG_E         | Integer   | British National Grid eastings        |
+| BNG_N         | Integer   | British National Grid northings       |
+| LAD19CD       | String    | Local Authority District code         |
+| LAD19NM       | String    | Local Authority District name         |
+| LAD19NMW      | String    | Local Authority District name (Welsh) |
+| LAT           | Double    | Latitude of centroid                  |
+| LONG          | Double    | Longitude of centroid                 |
+| Shape__Area   | Double    | Geometry area                         |
+| Shape__Length | Double    | Geometry perimeter length             |
+
+Rather than manually downloading the data, we'll use the public API to pull it:
 
 ```python
 # helpers.py
